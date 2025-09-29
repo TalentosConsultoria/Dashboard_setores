@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Financeiro Integrado</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- PapaParse para importação de CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/papaparse/5.3.0/papaparse.min.js"></script>
+
+    <!-- Estilos personalizados -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .kpi-card, .tab { transition: all 0.3s ease-in-out; }
+        .status-badge { padding: 4px 12px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #718096; }
+        .modal-enter { opacity: 0; transform: scale(0.95); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: all 300ms ease-out; }
+        .modal-leave { opacity: 1; transform: scale(1); }
+        .modal-leave-active { opacity: 0; transform: scale(0.95); transition: all 200ms ease-in; }
+        .loader{border:4px solid #f3f3f3;border-top:4px solid #3b82f6;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite}
+        @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <!-- Navegação por Abas -->
+    <nav class="bg-gray-800/50 backdrop-blur-sm sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-start h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i data-lucide="layout-dashboard" class="h-8 w-8 text-blue-400"></i>
+                    </div>
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <button id="tab-dashboard" class="tab bg-gray-900 text-white px-3 py-2 rounded-md text-sm font-medium">Dashboard</button>
+                        <button id="tab-management" class="tab text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Gerenciamento</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Conteúdo da Página -->
+    <main>
+        <!-- Página do Dashboard -->
+        <div id="page-dashboard">
+            <div id="app-container" class="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+                <header class="mb-8">
+                    <h1 class="text-3xl font-bold text-white">Dashboard Financeiro</h1>
+                    <p class="text-gray-400 mt-1">Visão analítica e em tempo real das suas notas fiscais.</p>
+                </header>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div id="card-a-receber" class="kpi-card bg-gray-800 p-6 rounded-lg shadow-lg border-l-4 border-gray-500">
+                        <div class="flex items-center justify-between"><h2 class="text-sm font-medium text-gray-400 uppercase">Valor a Receber</h2><i data-lucide="dollar-sign" class="w-6 h-6 text-gray-500"></i></div>
+                        <p id="valor-a-receber" class="text-3xl font-bold mt-2">R$ 0,00</p>
+                    </div>
+                    <div class="kpi-card bg-gray-800 p-6 rounded-lg shadow-lg border-l-4 border-green-500">
+                        <div class="flex items-center justify-between"><h2 class="text-sm font-medium text-gray-400 uppercase">Faturamento Total (Geral)</h2><i data-lucide="trending-up" class="w-6 h-6 text-gray-500"></i></div>
+                        <p id="total-faturado" class="text-3xl font-bold mt-2">R$ 0,00</p>
+                    </div>
+                    <div class="kpi-card bg-gray-800 p-6 rounded-lg shadow-lg border-l-4 border-blue-500">
+                        <div class="flex items-center justify-between"><h2 class="text-sm font-medium text-gray-400 uppercase">Faturamento no Mês</h2><i data-lucide="calendar" class="w-6 h-6 text-gray-500"></i></div>
+                        <p id="faturamento-mes" class="text-3xl font-bold mt-2">R$ 0,00</p>
+                        <div id="variacao-mensal" class="text-sm font-medium mt-1 text-gray-500 flex items-center gap-1"><span>--</span></div>
+                    </div>
+                    <div id="card-atrasadas" class="kpi-card bg-gray-800 p-6 rounded-lg shadow-lg border-l-4 border-gray-500">
+                        <div class="flex items-center justify-between"><h2 class="text-sm font-medium text-gray-400 uppercase">Notas Atrasadas</h2><i data-lucide="alert-triangle" class="w-6 h-6 text-gray-500"></i></div>
+                        <p id="notas-atrasadas" class="text-3xl font-bold mt-2">0</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                    <div class="lg:col-span-3 bg-gray-800 p-6 rounded-lg shadow-lg">
+                        <div class="flex items-center justify-between mb-6"><h3 class="text-lg font-semibold text-white flex items-center gap-2"><i data-lucide="pie-chart" class="w-5 h-5 text-blue-400"></i> Distribuição por Categoria</h3><span id="category-count-badge" class="text-xs font-medium bg-gray-700 text-gray-300 px-3 py-1 rounded-full">0 categorias</span></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                            <div class="relative h-64"><canvas id="categoryChart" class="cursor-pointer"></canvas><div id="category-chart-center" class="absolute inset-0 flex items-center justify-center pointer-events-none"><div class="text-center"><div class="text-2xl font-bold text-white">R$ 0</div><div class="text-xs text-gray-400">Total</div></div></div></div>
+                            <div class="space-y-6">
+                                <div><h4 class="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2"><i data-lucide="trending-up" class="w-4 h-4"></i> Top 3 Categorias</h4><div id="top-categories-list" class="space-y-3"><p class="text-sm text-gray-500">Calculando...</p></div></div>
+                                <div><h4 class="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2"><i data-lucide="target" class="w-4 h-4"></i> Detalhamento Completo</h4><div id="all-categories-list" class="space-y-4 max-h-48 overflow-y-auto custom-scrollbar pr-2"><p class="text-sm text-gray-500">Calculando...</p></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-2 space-y-6">
+                        <div class="bg-gray-800 p-6 rounded-lg shadow-lg"><h3 class="text-lg font-semibold text-white mb-4">Distribuição por Status</h3><div class="relative h-48"><canvas id="statusChart" class="cursor-pointer"></canvas></div></div>
+                        <div class="bg-gray-800 p-6 rounded-lg shadow-lg"><h3 class="text-lg font-semibold text-white mb-4">Notas Fiscais Recentes</h3><div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b border-gray-700"><th class="py-2 px-4 text-sm font-medium text-gray-400">Cliente</th><th class="py-2 px-4 text-sm font-medium text-gray-400">Valor</th><th class="py-2 px-4 text-sm font-medium text-gray-400">Status</th></tr></thead><tbody id="notas-tbody"><tr><td colspan="3" class="text-center py-8 text-gray-500">Carregando dados...</td></tr></tbody></table></div></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-lg"><h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2"><i data-lucide="award" class="w-5 h-5 text-yellow-400"></i> Top 5 Fornecedores</h3><div id="top-suppliers-list" class="space-y-4"><p class="text-sm text-gray-500">Calculando...</p></div></div>
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-lg"><h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2"><i data-lucide="bar-chart-2" class="w-5 h-5 text-purple-400"></i> Faturamento Mensal (Últimos 6 Meses)</h3><div class="relative h-64"><canvas id="monthlyRevenueChart" class="cursor-pointer"></canvas></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Página de Gerenciamento -->
+        <div id="page-management" class="hidden">
+             <div class="p-6 max-w-7xl mx-auto text-gray-800">
+                <header class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold text-white">Controle de Notas Fiscais</h1>
+                        <p class="text-gray-400">Gerencie suas notas fiscais em tempo real no Firestore.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label for="csv-importer" class="cursor-pointer inline-flex items-center gap-2 bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700">
+                            <i data-lucide="upload-cloud"></i><span>Importar CSV</span>
+                        </label>
+                        <input type="file" id="csv-importer" accept=".csv" class="hidden">
+                        <button id="add-note-btn" class="inline-flex items-center gap-2 bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700">
+                            <i data-lucide="plus-circle"></i><span>Adicionar Nota</span>
+                        </button>
+                    </div>
+                </header>
+
+                <div class="mb-4">
+                    <div class="bg-gray-800 p-4 rounded-lg shadow-sm flex items-center gap-4">
+                        <div class="relative flex-grow">
+                            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"></i>
+                            <input id="search-input" placeholder="Buscar por fornecedor, categoria ou nº da nota..." class="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 text-white rounded-lg focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+                    <div id="loader-management" class="flex justify-center items-center h-64"><div class="loader"></div></div>
+                    <div id="table-container" class="overflow-x-auto hidden">
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-700/50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Nº Nota</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Fornecedor</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Categoria</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Emissão</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Valor Total</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="notes-tbody" class="divide-y divide-gray-700"></tbody>
+                        </table>
+                    </div>
+                    <div id="empty-state" class="text-center py-16 hidden">
+                        <i data-lucide="file-text" class="mx-auto h-12 w-12 text-gray-500"></i>
+                        <h3 class="mt-2 text-sm font-medium text-gray-200">Nenhuma nota fiscal encontrada</h3>
+                        <p class="mt-1 text-sm text-gray-400">Comece adicionando uma nova nota fiscal.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal para Detalhes (Dashboard) -->
+    <div id="details-modal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 hidden">
+        <div id="modal-content" class="bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col modal-enter">
+            <div class="flex items-center justify-between p-4 border-b border-gray-700"><h3 id="modal-title" class="text-xl font-bold text-white">Detalhes</h3><button id="modal-close-btn" class="text-gray-400 hover:text-white transition-colors"><i data-lucide="x" class="w-6 h-6"></i></button></div>
+            <div id="modal-body" class="p-6 overflow-y-auto custom-scrollbar"></div>
+        </div>
+    </div>
+    
+    <!-- Modal para Adicionar/Editar Nota (Gerenciamento) -->
+    <div id="note-modal" class="fixed inset-0 bg-gray-900/60 hidden items-center justify-center p-4 z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl text-gray-300">
+            <form id="note-form">
+                <input type="hidden" id="note-id">
+                <div class="p-6">
+                    <div class="flex justify-between items-start"><h2 id="form-modal-title" class="text-2xl font-bold text-white">Adicionar Nova Nota</h2><button type="button" id="form-close-modal-btn" class="p-1 rounded-full hover:bg-gray-700"><i data-lucide="x" class="w-6 h-6"></i></button></div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-6">
+                        <div><label class="block text-sm font-medium">Nº da Nota</label><input id="n-nota" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white" required></div>
+                        <div><label class="block text-sm font-medium">Data de Emissão</label><input type="date" id="dataEmissao" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white" required></div>
+                        <div class="sm:col-span-2"><label class="block text-sm font-medium">Fornecedor / Cliente</label><input id="cliente" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white" required></div>
+                        <div class="sm:col-span-2"><label class="block text-sm font-medium">Categoria</label><input id="categoria" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white" required></div>
+                        <div><label class="block text-sm font-medium">Data de Vencimento</label><input type="date" id="dataVencimento" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white" required></div>
+                        <div><label class="block text-sm font-medium">Valor Total (R$)</label><input type="number" id="valor" min="0" step="0.01" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white" required></div>
+                        <div><label class="block text-sm font-medium">Status</label><select id="status" class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white" required><option>Pendente</option><option>Paga</option></select></div>
+                    </div>
+                </div>
+                <div class="bg-gray-900 px-6 py-4 flex justify-end gap-3"><button type="button" id="cancel-btn" class="bg-gray-700 py-2 px-4 border border-gray-600 rounded-md text-sm hover:bg-gray-600">Cancelar</button><button type="submit" id="save-btn" class="py-2 px-4 text-sm rounded-md text-white bg-blue-600 hover:bg-blue-700">Salvar Nota</button></div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-5 right-5 bg-green-500 text-white py-2 px-5 rounded-lg shadow-lg text-sm transition-transform translate-x-[120%] duration-300">
+        <p id="toast-message"></p>
+    </div>
+
+    <!-- Script de inicialização do Firebase e lógica do dashboard -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, query, onSnapshot, addDoc, doc, updateDoc, deleteDoc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC-XUKRowHPdUkC9W9sBOAo8oAVb_AabUM",
+            authDomain: "dashboard-nremp.firebaseapp.com",
+            projectId: "dashboard-nremp",
+            storageBucket: "dashboard-nremp.firebasestorage.app",
+            messagingSenderId: "334752740963",
+            appId: "1:334752740963:web:e7448b2eff74bc39096a56"
+        };
+        
+        // --- INICIALIZAÇÃO GERAL ---
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app, 'bdnremp');
+        const auth = getAuth(app);
+
+        let unsubscribeDashboard = null;
+        let unsubscribeManagement = null;
+        let globalNotas = [];
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+
+        // --- LÓGICA DE NAVEGAÇÃO POR ABAS ---
+        const tabs = {
+            dashboard: document.getElementById('tab-dashboard'),
+            management: document.getElementById('tab-management'),
+        };
+        const pages = {
+            dashboard: document.getElementById('page-dashboard'),
+            management: document.getElementById('page-management'),
+        };
+
+        function setActiveTab(tabName) {
+            Object.values(tabs).forEach(tab => tab.classList.remove('bg-gray-900', 'text-white'));
+            Object.values(tabs).forEach(tab => tab.classList.add('text-gray-300', 'hover:bg-gray-700', 'hover:text-white'));
+            Object.values(pages).forEach(page => page.classList.add('hidden'));
+
+            tabs[tabName].classList.add('bg-gray-900', 'text-white');
+            tabs[tabName].classList.remove('text-gray-300', 'hover:bg-gray-700', 'hover:text-white');
+            pages[tabName].classList.remove('hidden');
+
+            if (tabName === 'dashboard') {
+                if (unsubscribeManagement) { unsubscribeManagement(); unsubscribeManagement = null; }
+                if (!unsubscribeDashboard) startRealtimeDashboard();
+            } else if (tabName === 'management') {
+                if (unsubscribeDashboard) { unsubscribeDashboard(); unsubscribeDashboard = null; }
+                if (!unsubscribeManagement) startRealtimeManagement();
+            }
+        }
+        
+        tabs.dashboard.addEventListener('click', () => setActiveTab('dashboard'));
+        tabs.management.addEventListener('click', () => setActiveTab('management'));
+
+        // --- AUTENTICAÇÃO E INÍCIO ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setActiveTab('dashboard'); // Inicia na aba do dashboard
+            } else {
+                signInAnonymously(auth).catch((e) => console.error('Falha na autenticação:', e));
+            }
+        });
+        
+        // --- FUNÇÕES UTILITÁRIAS ---
+        const formatCurrency = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const getStatusBadge = (status) => {
+            const colors = { Paga: 'green', Pendente: 'yellow', Atrasada: 'red' };
+            const color = colors[status] || 'gray';
+            return `<span class="status-badge bg-${color}-500/20 text-${color}-400">${status}</span>`;
+        };
+        
+        // #############################################################
+        // ### LÓGICA DA PÁGINA DE DASHBOARD                         ###
+        // #############################################################
+        const valorAReceberEl = document.getElementById('valor-a-receber');
+        const totalFaturadoEl = document.getElementById('total-faturado');
+        const notasAtrasadasEl = document.getElementById('notas-atrasadas');
+        const faturamentoMesEl = document.getElementById('faturamento-mes');
+        const variacaoMensalEl = document.getElementById('variacao-mensal');
+        const cardAReceberEl = document.getElementById('card-a-receber');
+        const cardAtrasadasEl = document.getElementById('card-atrasadas');
+        const notasTbodyEl = document.getElementById('notas-tbody');
+        const categoryCountBadgeEl = document.getElementById('category-count-badge');
+        const categoryChartCenterEl = document.getElementById('category-chart-center');
+        const topCategoriesListEl = document.getElementById('top-categories-list');
+        const allCategoriesListEl = document.getElementById('all-categories-list');
+        const topSuppliersListEl = document.getElementById('top-suppliers-list');
+        const detailsModalEl = document.getElementById('details-modal');
+        const modalContentEl = document.getElementById('modal-content');
+        const modalTitleEl = document.getElementById('modal-title');
+        const modalBodyEl = document.getElementById('modal-body');
+        document.getElementById('modal-close-btn').addEventListener('click', () => hideDetailsModal());
+        detailsModalEl.addEventListener('click', (e) => { if (e.target === detailsModalEl) hideDetailsModal(); });
+
+        let statusChart, categoryChart, monthlyRevenueChart;
+
+        function startRealtimeDashboard() {
+            initDashboardCharts();
+            const q = query(collection(db, 'notas_fiscais'));
+            unsubscribeDashboard = onSnapshot(q, (snapshot) => {
+                let totalFaturado = 0, valorAReceber = 0, faturamentoMesAtual = 0, faturamentoMesAnterior = 0;
+                const statusCounts = { Paga: 0, Pendente: 0, Atrasada: 0 };
+                const categoryTotals = {}, supplierTotals = {}, monthlyTotals = {};
+                const todasAsNotas = [];
+                const mesAtual = hoje.getMonth(), anoAtual = hoje.getFullYear();
+                const mesAnterior = mesAtual === 0 ? 11 : mesAtual - 1;
+                const anoMesAnterior = mesAtual === 0 ? anoAtual - 1 : anoAtual;
+
+                snapshot.forEach(doc => {
+                    const nota = { id: doc.id, ...doc.data() };
+                    let statusFinal = nota.status;
+                    if (nota.status === 'Pendente' && new Date(nota.dataVencimento) < hoje) statusFinal = 'Atrasada';
+                    nota.statusFinal = statusFinal;
+                    todasAsNotas.push(nota);
+                    
+                    totalFaturado += nota.valor;
+                    if (statusFinal !== 'Paga') valorAReceber += nota.valor;
+                    statusCounts[statusFinal]++;
+
+                    const category = nota.categoria || 'Outros';
+                    categoryTotals[category] = (categoryTotals[category] || 0) + nota.valor;
+                    const supplier = nota.cliente || 'Desconhecido';
+                    supplierTotals[supplier] = (supplierTotals[supplier] || 0) + nota.valor;
+                    
+                    const dataNota = new Date(nota.dataEmissao);
+                    if (dataNota.getMonth() === mesAtual && dataNota.getFullYear() === anoAtual) faturamentoMesAtual += nota.valor;
+                    if (dataNota.getMonth() === mesAnterior && dataNota.getFullYear() === anoMesAnterior) faturamentoMesAnterior += nota.valor;
+
+                    const monthYear = `${dataNota.getMonth() + 1}/${dataNota.getFullYear()}`;
+                    monthlyTotals[monthYear] = (monthlyTotals[monthYear] || 0) + nota.valor;
+                });
+                
+                globalNotas = todasAsNotas;
+                updateDashboardUI(statusCounts, categoryTotals, supplierTotals, monthlyTotals, todasAsNotas, totalFaturado, valorAReceber, faturamentoMesAtual, faturamentoMesAnterior);
+                lucide.createIcons();
+            });
+        }
+
+        function updateDashboardUI(statusCounts, categoryTotals, supplierTotals, monthlyTotals, todasAsNotas, totalFaturado, valorAReceber, faturamentoMesAtual, faturamentoMesAnterior) {
+            valorAReceberEl.textContent = formatCurrency(valorAReceber);
+            totalFaturadoEl.textContent = formatCurrency(totalFaturado);
+            faturamentoMesEl.textContent = formatCurrency(faturamentoMesAtual);
+            notasAtrasadasEl.textContent = statusCounts.Atrasada;
+
+            let variacao = faturamentoMesAnterior > 0 ? ((faturamentoMesAtual - faturamentoMesAnterior) / faturamentoMesAnterior) * 100 : (faturamentoMesAtual > 0 ? 100 : 0);
+            variacaoMensalEl.className = `text-sm font-medium mt-1 flex items-center gap-1 ${variacao > 0 ? 'text-green-400' : variacao < 0 ? 'text-red-400' : 'text-gray-500'}`;
+            variacaoMensalEl.innerHTML = variacao !== 0 ? `<i data-lucide="${variacao > 0 ? 'arrow-up' : 'arrow-down'}" class="w-4 h-4"></i> ${variacao.toFixed(1)}% vs. mês anterior` : `<span>--</span>`;
+            
+            cardAReceberEl.className = `kpi-card bg-gray-800 p-6 rounded-lg shadow-lg border-l-4 ${statusCounts.Atrasada > 0 ? 'border-red-500' : statusCounts.Pendente > 0 ? 'border-yellow-500' : 'border-green-500'}`;
+            cardAtrasadasEl.className = `kpi-card bg-gray-800 p-6 rounded-lg shadow-lg border-l-4 ${statusCounts.Atrasada > 0 ? 'border-red-500' : 'border-gray-500'}`;
+
+            statusChart.data.datasets[0].data = [statusCounts.Paga, statusCounts.Pendente, statusCounts.Atrasada];
+            statusChart.update();
+
+            notasTbodyEl.innerHTML = '';
+            if (todasAsNotas.length === 0) {
+                notasTbodyEl.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-gray-500">Nenhuma nota fiscal encontrada.</td></tr>';
+            } else {
+                todasAsNotas.sort((a, b) => new Date(b.dataEmissao) - new Date(a.dataEmissao)).slice(0, 5).forEach(nota => {
+                    notasTbodyEl.innerHTML += `<tr class="border-b border-gray-700 hover:bg-gray-700/50"><td class="py-3 px-4 font-medium">${nota.cliente}</td><td class="py-3 px-4 text-gray-400">${formatCurrency(nota.valor)}</td><td class="py-3 px-4">${getStatusBadge(nota.statusFinal)}</td></tr>`;
+                });
+            }
+            
+            updateCategorySection(categoryTotals, totalFaturado);
+            updateTopSuppliers(supplierTotals);
+            updateMonthlyRevenueChart(monthlyTotals);
+        }
+        
+        // ... (resto das funções de atualização do dashboard: updateCategorySection, etc.)
+        function updateCategorySection(categoryTotals, totalFaturado) {
+            const categoryData = Object.entries(categoryTotals)
+                .map(([name, value]) => ({ name, value, percentage: totalFaturado > 0 ? ((value / totalFaturado) * 100).toFixed(1) : 0 }))
+                .sort((a, b) => b.value - a.value);
+
+            categoryChart.data.labels = categoryData.map(c => c.name);
+            categoryChart.data.datasets[0].data = categoryData.map(c => c.value);
+            categoryChart.data.datasets[0].backgroundColor = categoryData.map((_, index) => ['#FF6B6B', '#4ECDC4', '#45B7D1', '#F7DC6F', '#BB8FCE', '#F8C471', '#85C1E9', '#82E0AA'][index % 8]);
+            categoryChart.update();
+
+            categoryChartCenterEl.innerHTML = `<div class="text-center"><div class="text-2xl font-bold text-white">${formatCurrency(totalFaturado)}</div><div class="text-xs text-gray-400">Total</div></div>`;
+            categoryCountBadgeEl.textContent = `${categoryData.length} categorias`;
+            
+            topCategoriesListEl.innerHTML = categoryData.length === 0 ? '<p class="text-sm text-gray-500">Sem dados.</p>' : '';
+            allCategoriesListEl.innerHTML = categoryData.length === 0 ? '<p class="text-sm text-gray-500">Sem dados.</p>' : '';
+
+            categoryData.slice(0, 3).forEach((cat, index) => {
+                const color = ['#FF6B6B', '#4ECDC4', '#45B7D1'][index % 3];
+                topCategoriesListEl.innerHTML += `<div class="flex items-center gap-3"><div class="flex items-center gap-2 flex-1 min-w-0"><div class="w-4 h-4 rounded-full flex-shrink-0" style="background-color: ${color}"></div><span class="font-medium text-gray-300 truncate">${cat.name}</span></div><div class="flex items-center gap-2"><span class="text-xs font-semibold" style="color: ${color}">${cat.percentage}%</span><div class="text-sm font-semibold text-gray-300">${formatCurrency(cat.value)}</div></div></div>`;
+            });
+            
+            categoryData.forEach((cat, index) => {
+                const color = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#F7DC6F', '#BB8FCE', '#F8C471', '#85C1E9', '#82E0AA'][index % 8];
+                allCategoriesListEl.innerHTML += `<div class="space-y-2"><div class="flex justify-between items-center"><div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full" style="background-color: ${color}"></div><span class="text-sm text-gray-300">${cat.name}</span></div><div class="text-right"><div class="text-sm font-medium text-gray-300">${formatCurrency(cat.value)}</div><div class="text-xs text-gray-400">${cat.percentage}%</div></div></div><div class="w-full bg-gray-700 rounded-full h-1.5"><div class="h-1.5 rounded-full" style="width: ${cat.percentage}%; background-color: ${color}"></div></div></div>`;
+            });
+        }
+        function updateTopSuppliers(supplierTotals) {
+            const suppliersData = Object.entries(supplierTotals).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 5);
+            topSuppliersListEl.innerHTML = suppliersData.length === 0 ? '<p class="text-sm text-gray-500">Sem dados.</p>' : '';
+            suppliersData.forEach((s, i) => {
+                topSuppliersListEl.innerHTML += `<div class="flex items-center gap-4"><span class="flex items-center justify-center w-8 h-8 rounded-full bg-gray-700 text-sm font-bold">${i + 1}</span><div class="flex-1 min-w-0"><p class="font-medium text-gray-300 truncate">${s.name}</p></div><span class="font-semibold text-gray-300">${formatCurrency(s.value)}</span></div>`;
+            });
+        }
+        function updateMonthlyRevenueChart(monthlyTotals) {
+            const labels = []; const data = [];
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+                labels.push(d.toLocaleString('pt-BR', { month: 'short' }).replace('.', ''));
+                const key = `${d.getMonth() + 1}/${d.getFullYear()}`;
+                data.push(monthlyTotals[key] || 0);
+            }
+            monthlyRevenueChart.data.labels = labels;
+            monthlyRevenueChart.data.datasets[0].data = data;
+            monthlyRevenueChart.update();
+        }
+        function initDashboardCharts() {
+            if (statusChart) return; // Evita reinicialização
+            const statusCtx = document.getElementById('statusChart').getContext('2d');
+            statusChart = new Chart(statusCtx, { type: 'doughnut', data: { labels: ['Pagas', 'Pendentes', 'Atrasadas'], datasets: [{ data: [0, 0, 0], backgroundColor: ['#22c55e', '#eab308', '#ef4444'], borderColor: '#1f2937', borderWidth: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#d1d5db' } } }, cutout: '60%', onClick: (e, el) => { if(el.length) showDetailedView('status', statusChart.data.labels[el[0].index]); } } });
+            const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+            categoryChart = new Chart(categoryCtx, { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderColor: '#1f2937', borderWidth: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '75%', onClick: (e, el) => { if(el.length) showDetailedView('category', categoryChart.data.labels[el[0].index]); } } });
+            const monthlyCtx = document.getElementById('monthlyRevenueChart').getContext('2d');
+            monthlyRevenueChart = new Chart(monthlyCtx, { type: 'bar', data: { labels: [], datasets: [{ label: 'Faturamento', data: [], backgroundColor: '#4f46e5', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } }, x: { ticks: { color: '#9ca3af' }, grid: { display: false } } }, onClick: (e, el) => { if(el.length) showDetailedView('month', el[0].index); } } });
+        }
+        function hideDetailsModal() {
+            modalContentEl.classList.add('modal-leave-active');
+            setTimeout(() => { detailsModalEl.classList.add('hidden'); modalContentEl.classList.remove('modal-leave-active'); }, 200);
+        }
+        function showDetailedView(filterType, filterValue) {
+            let filteredData = []; let title = 'Detalhes';
+            if (filterType === 'status') { title = `Notas: ${filterValue}`; filteredData = globalNotas.filter(n => n.statusFinal === filterValue); }
+            else if (filterType === 'category') { title = `Categoria: ${filterValue}`; filteredData = globalNotas.filter(n => (n.categoria || 'Outros') === filterValue); }
+            else if (filterType === 'month') {
+                const targetMonth = new Date(hoje.getFullYear(), hoje.getMonth() - (5 - filterValue), 1);
+                title = `Mês: ${targetMonth.toLocaleString('pt-BR', {month: 'long', year: 'numeric'})}`;
+                filteredData = globalNotas.filter(n => { const d = new Date(n.dataEmissao); return d.getMonth() === targetMonth.getMonth() && d.getFullYear() === targetMonth.getFullYear(); });
+            }
+            modalTitleEl.textContent = title;
+            modalBodyEl.innerHTML = filteredData.length === 0 ? '<p class="text-gray-400 text-center">Nenhum dado.</p>' : '';
+            if (filteredData.length > 0) {
+                const table = document.createElement('table'); table.className = 'w-full text-left';
+                table.innerHTML = `<thead class="sticky top-0 bg-gray-800"><tr><th class="py-2 px-4 text-sm font-medium text-gray-400">Cliente</th><th class="py-2 px-4 text-sm font-medium text-gray-400">Valor</th><th class="py-2 px-4 text-sm font-medium text-gray-400">Categoria</th><th class="py-2 px-4 text-sm font-medium text-gray-400">Status</th><th class="py-2 px-4 text-sm font-medium text-gray-400">Vencimento</th></tr></thead>`;
+                const tbody = document.createElement('tbody');
+                filteredData.sort((a,b) => new Date(b.dataEmissao) - new Date(a.dataEmissao)).forEach(n => {
+                    tbody.innerHTML += `<tr class="border-b border-gray-700 hover:bg-gray-700/50"><td class="py-3 px-4 font-medium">${n.cliente}</td><td class="py-3 px-4 text-gray-400">${formatCurrency(n.valor)}</td><td class="py-3 px-4 text-gray-400">${n.categoria||'Outros'}</td><td class="py-3 px-4">${getStatusBadge(n.statusFinal)}</td><td class="py-3 px-4 text-gray-400">${new Date(n.dataVencimento).toLocaleDateString('pt-BR')}</td></tr>`;
+                });
+                table.appendChild(tbody);
+                modalBodyEl.appendChild(table);
+            }
+            detailsModalEl.classList.remove('hidden'); modalContentEl.classList.add('modal-enter-active');
+        }
+
+        // #############################################################
+        // ### LÓGICA DA PÁGINA DE GERENCIAMENTO                     ###
+        // #############################################################
+        const mgmt = {
+            loader: document.getElementById('loader-management'),
+            tableContainer: document.getElementById('table-container'),
+            emptyState: document.getElementById('empty-state'),
+            notesTbody: document.getElementById('notes-tbody'),
+            addNoteBtn: document.getElementById('add-note-btn'),
+            modal: document.getElementById('note-modal'),
+            closeModalBtn: document.getElementById('form-close-modal-btn'),
+            cancelBtn: document.getElementById('cancel-btn'),
+            noteForm: document.getElementById('note-form'),
+            modalTitle: document.getElementById('form-modal-title'),
+            searchInput: document.getElementById('search-input'),
+            toast: document.getElementById('toast'),
+            toastMessage: document.getElementById('toast-message'),
+            csvImporter: document.getElementById('csv-importer')
+        };
+        let allManagementNotes = [];
+
+        function startRealtimeManagement() {
+            bindManagementUI();
+            const q = query(collection(db, 'notas_fiscais'));
+            unsubscribeManagement = onSnapshot(q, (snapshot) => {
+                allManagementNotes = snapshot.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => new Date(b.dataEmissao) - new Date(a.dataEmissao));
+                renderManagementTable(allManagementNotes);
+                mgmt.loader.classList.add('hidden');
+            }, (err) => {
+                console.error('Erro ao buscar notas:', err);
+                showToast('Erro ao carregar dados.', 'error');
+                mgmt.loader.classList.add('hidden');
+            });
+        }
+        
+        function renderManagementTable(notes) {
+            mgmt.notesTbody.innerHTML = '';
+            if (notes.length === 0 && mgmt.searchInput.value === '') {
+                mgmt.emptyState.classList.remove('hidden');
+                mgmt.tableContainer.classList.add('hidden');
+            } else {
+                mgmt.emptyState.classList.add('hidden');
+                mgmt.tableContainer.classList.remove('hidden');
+                notes.forEach(n => {
+                    const statusFinal = (n.status === 'Pendente' && new Date(n.dataVencimento) < hoje) ? 'Atrasada' : n.status;
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-gray-700';
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 text-sm font-medium text-gray-200">${n.nNota || 'N/A'}</td>
+                        <td class="px-6 py-4 text-sm text-gray-400">${n.cliente || 'N/A'}</td>
+                        <td class="px-6 py-4 text-sm text-gray-400 max-w-xs truncate" title="${n.categoria || ''}">${n.categoria || 'N/A'}</td>
+                        <td class="px-6 py-4 text-sm text-gray-400">${new Date(n.dataEmissao).toLocaleDateString('pt-BR')}</td>
+                        <td class="px-6 py-4 text-sm">${getStatusBadge(statusFinal)}</td>
+                        <td class="px-6 py-4 text-sm text-gray-300 font-semibold">${formatCurrency(n.valor)}</td>
+                        <td class="px-6 py-4 text-right text-sm">
+                            <button data-id="${n.id}" class="edit-btn text-blue-400 hover:text-blue-300 mr-3 p-1"><i data-lucide="edit" class="w-5 h-5 pointer-events-none"></i></button>
+                            <button data-id="${n.id}" class="delete-btn text-red-400 hover:text-red-300 p-1"><i data-lucide="trash-2" class="w-5 h-5 pointer-events-none"></i></button>
+                        </td>`;
+                    mgmt.notesTbody.appendChild(tr);
+                });
+            }
+            lucide.createIcons();
+        }
+
+       // Helper: normaliza para "YYYY-MM-DD" sem sofrer com fuso horário
+function toInputDate(value) {
+  if (!value) return '';
+
+  // Se já estiver no formato YYYY-MM-DD
+  if (typeof value === 'string' && value.length === 10 && value.includes('-')) {
+    return value;
+  }
+
+  // Timestamp numérico (ms) ou string ISO
+  const d = new Date(value);
+  if (isNaN(d)) return '';
+
+  // Remove o efeito do timezone para inputs de data
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function bindManagementUI() {
+  if (mgmt.addNoteBtn.dataset.bound) return; // Evita re-binding
+
+  // Abrir modal "Adicionar Nova Nota" com datas padrão
+  mgmt.addNoteBtn.addEventListener('click', () => {
+    mgmt.noteForm.reset();
+    document.getElementById('note-id').value = '';
+
+    // Datas padrão: emissão = hoje, vencimento = hoje + 30
+    const emissaoInput = document.getElementById('dataEmissao');
+    const vencInput    = document.getElementById('dataVencimento');
+
+    const hoje = new Date();
+    emissaoInput.valueAsDate = hoje;
+
+    const v = new Date(hoje);
+    v.setDate(v.getDate() + 30);
+    vencInput.valueAsDate = v;
+
+    mgmt.modalTitle.textContent = 'Adicionar Nova Nota';
+    mgmt.modal.classList.remove('hidden');
+    mgmt.modal.classList.add('flex');
+  });
+
+  const closeFormModal = () => mgmt.modal.classList.add('hidden');
+  mgmt.closeModalBtn.addEventListener('click', closeFormModal);
+  mgmt.cancelBtn.addEventListener('click', closeFormModal);
+
+  mgmt.noteForm.addEventListener('submit', handleFormSubmit);
+  mgmt.searchInput.addEventListener('input', handleSearch);
+
+  // Ações da tabela (Editar / Excluir)
+  mgmt.notesTbody.addEventListener('click', (e) => {
+    const editBtn = e.target.closest('.edit-btn');
+    const deleteBtn = e.target.closest('.delete-btn');
+
+    if (editBtn) {
+      const note = allManagementNotes.find(n => n.id === editBtn.dataset.id);
+      if (!note) return;
+
+      mgmt.noteForm.reset();
+
+      // Preenche campos
+      document.getElementById('note-id').value   = note.id;
+      document.getElementById('n-nota').value    = note.nNota || '';
+      document.getElementById('cliente').value   = note.cliente || '';
+      document.getElementById('categoria').value = note.categoria || '';
+
+      // Datas normalizadas (aceita dataEmissao / dataEmissaoMs e dataVencimento / dataVencimentoMs)
+      document.getElementById('dataEmissao').value    = toInputDate(note.dataEmissaoMs ?? note.dataEmissao);
+      document.getElementById('dataVencimento').value = toInputDate(note.dataVencimentoMs ?? note.dataVencimento);
+
+      document.getElementById('valor').value   = note.valor || 0;
+      document.getElementById('status').value  = note.status || 'Pendente';
+
+      mgmt.modalTitle.textContent = 'Editar Nota Fiscal';
+      mgmt.modal.classList.remove('hidden');
+      mgmt.modal.classList.add('flex');
+    }
+
+    if (deleteBtn) {
+      handleDelete(deleteBtn.dataset.id);
+    }
+  });
+
+  mgmt.csvImporter.addEventListener('change', handleCsvImport);
+  mgmt.addNoteBtn.dataset.bound = true;
+}
+
+        function handleSearch() {
+            const query = mgmt.searchInput.value.toLowerCase();
+            const filtered = allManagementNotes.filter(n =>
+                (n.cliente || '').toLowerCase().includes(query) ||
+                (n.categoria || '').toLowerCase().includes(query) ||
+                (n.nNota || '').toLowerCase().includes(query)
+            );
+            renderManagementTable(filtered);
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('note-id').value;
+            const noteData = {
+                nNota: document.getElementById('n-nota').value,
+                dataEmissao: new Date(document.getElementById('dataEmissao').value).toISOString(),
+                cliente: document.getElementById('cliente').value,
+                categoria: document.getElementById('categoria').value,
+                dataVencimento: new Date(document.getElementById('dataVencimento').value).toISOString(),
+                valor: parseFloat(document.getElementById('valor').value) || 0,
+                status: document.getElementById('status').value,
+            };
+            try {
+                if (id) {
+                    await updateDoc(doc(db, 'notas_fiscais', id), noteData);
+                    showToast('Nota atualizada com sucesso!');
+                } else {
+                    await addDoc(collection(db, 'notas_fiscais'), { ...noteData, createdAt: serverTimestamp() });
+                    showToast('Nota adicionada com sucesso!');
+                }
+                mgmt.modal.classList.add('hidden');
+            } catch (err) { console.error('Erro ao salvar nota:', err); showToast('Erro ao salvar a nota.', 'error'); }
+        }
+
+        async function handleDelete(id) {
+            if (!confirm('Tem certeza que deseja excluir esta nota?')) return;
+            try {
+                await deleteDoc(doc(db, 'notas_fiscais', id));
+                showToast('Nota excluída com sucesso!');
+            } catch (err) { console.error('Erro ao excluir nota:', err); showToast('Erro ao excluir a nota.', 'error'); }
+        }
+
+        function handleCsvImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: async (results) => {
+                    const notesToUpload = results.data.map(row => {
+                        const valor = parseFloat((row['Valor Total'] || row['valor'] || '0').replace(/\./g, '').replace(',', '.')) || 0;
+                        if (!row['Fornecedor'] || !row['data'] || !valor) return null;
+                        
+                        const dataEmissao = new Date(row['data']);
+                        const dataVencimento = new Date(dataEmissao);
+                        dataVencimento.setDate(dataVencimento.getDate() + 30); // Vencimento em 30 dias
+                        
+                        return {
+                            cliente: row['Fornecedor'],
+                            valor: valor,
+                            status: 'Pendente',
+                            categoria: row['Categoria'] || 'Importado',
+                            dataEmissao: dataEmissao.toISOString(),
+                            dataVencimento: dataVencimento.toISOString(),
+                            nNota: row['N Nota'] || `CSV-${Date.now()}`
+                        };
+                    }).filter(Boolean); // Remove linhas nulas
+
+                    if (notesToUpload.length > 0) {
+                        try {
+                            const batch = writeBatch(db);
+                            notesToUpload.forEach(note => {
+                                const docRef = doc(collection(db, "notas_fiscais"));
+                                batch.set(docRef, note);
+                            });
+                            await batch.commit();
+                            showToast(`${notesToUpload.length} notas importadas com sucesso!`);
+                        } catch (err) {
+                            console.error("Erro ao importar CSV:", err);
+                            showToast('Falha na importação do CSV.', 'error');
+                        }
+                    } else {
+                        showToast('Nenhuma linha válida encontrada no CSV.', 'error');
+                    }
+                },
+                error: (err) => {
+                    console.error("Erro ao parsear CSV:", err);
+                    showToast('Erro ao ler o arquivo CSV.', 'error');
+                }
+            });
+            event.target.value = ''; // Limpa o input para permitir re-upload
+        }
+
+        function showToast(message, type = 'success') {
+            mgmt.toastMessage.textContent = message;
+            mgmt.toast.className = `fixed top-5 right-5 text-white py-2 px-5 rounded-lg shadow-lg text-sm transition-transform duration-300 ${type === 'success' ? 'bg-green-500' : 'bg-red-500'}`;
+            mgmt.toast.classList.remove('translate-x-[120%]');
+            setTimeout(() => mgmt.toast.classList.add('translate-x-[120%]'), 3000);
+        }
+
+    </script>
+</body>
+</html>
+
