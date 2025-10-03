@@ -125,18 +125,16 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, title }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75" onClick={onClose}>
       <div 
-        className="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl text-gray-300 border border-gray-700 animate-in fade-in-0 zoom-in-95 flex flex-col max-h-[90vh]"
+        className="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl text-gray-300 border border-gray-700 animate-in fade-in-0 zoom-in-95"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
+        <div className="flex items-center justify-between p-4 border-b border-gray-700">
           <h2 className="text-xl font-bold text-white">{title}</h2>
           <Button variant="ghost" size="icon" onClick={onClose} className="p-1 rounded-full">
             <IconX className="w-6 h-6" />
           </Button>
         </div>
-        <div className="overflow-y-auto custom-scrollbar flex-grow">
-          {children}
-        </div>
+        {children}
       </div>
     </div>
   );

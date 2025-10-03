@@ -1,5 +1,6 @@
+
 {
-  "name": "Firebase Financial Dashboard",
-  "description": "A real-time, interactive financial dashboard connected to Firebase. It provides analytics, charts, and management tools for financial records, including features for adding, editing, deleting, and importing data.",
+  "name": "Dashboard Financeiro Firebase",
+  "description": "Um painel financeiro interativo e em tempo real conectado ao Firebase. Ele fornece análises, gráficos e ferramentas de gerenciamento para registros financeiros, incluindo recursos para adicionar, editar, excluir e importar dados.",
   "requestFramePermissions": []
 }

@@ -1,16 +1,16 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { subscribeToNotes, subscribeToUsers, signInWithCredentials, signOutUser } from './services/firebaseService';
+import { firebaseSignOut, subscribeToNotes, subscribeToUsers } from './services/firebaseService';
 import { getVeiculos } from './services/fleetApiService';
 import { Home } from './components/Home';
 import { Dashboard } from './components/Dashboard';
 import { Management } from './components/Management';
 import { Fleet } from './components/Fleet';
 import { UsersPage } from './components/Users';
-import { Button, Input, Spinner, Toast, IconTalentosLogo, IconLogOut } from './components/ui';
+import { Button, Input, Spinner, Toast, IconTalentosLogo, IconLogOut, IconUsers } from './components/ui';
 import type { Note, Veiculo, User } from './types';
 import { useAuth } from './contexts/AuthContext';
-
+import { auth, signInWithEmailAndPassword } from './services/firebaseService';
 
 // Login Page Component
 const LoginPage: React.FC = () => {
@@ -24,7 +24,7 @@ const LoginPage: React.FC = () => {
     setIsLoading(true);
     setError('');
     try {
-      await signInWithCredentials(email, password);
+      await signInWithEmailAndPassword(auth, email, password);
     } catch (err: any) {
       let friendlyMessage = 'Ocorreu um erro. Tente novamente.';
       if (err.code) {
@@ -79,7 +79,7 @@ const LoginPage: React.FC = () => {
 
 
 // Main App Component
-type Tab = 'home' | 'dashboard' | 'gerenciamento' | 'frota' | 'users';
+type Tab = 'home' | 'dashboard' | 'management' | 'fleet' | 'users';
 
 const App: React.FC = () => {
   const { user, profile, loading: authLoading, hasModuleAccess } = useAuth();
@@ -145,7 +145,7 @@ const App: React.FC = () => {
 
 
   const handleSignOut = async () => {
-    await signOutUser();
+    await firebaseSignOut(auth);
   };
   
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
@@ -161,6 +161,7 @@ const App: React.FC = () => {
   
   useEffect(() => {
     if (!profile) return;
+    // Reset to home if user loses access to the current tab (e.g., role change)
     if (!hasModuleAccess(activeTab) && activeTab !== 'home') {
       setActiveTab('home');
     }
@@ -189,8 +190,8 @@ const App: React.FC = () => {
               <div className="ml-10 flex items-baseline space-x-4">
                 <button onClick={() => setActiveTab('home')} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'home' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}>Início</button>
                 {hasModuleAccess('dashboard') && <button onClick={() => setActiveTab('dashboard')} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'dashboard' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}>Dashboard</button>}
-                {hasModuleAccess('gerenciamento') && <button onClick={() => setActiveTab('gerenciamento')} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'gerenciamento' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}>Gerenciamento</button>}
-                {hasModuleAccess('frota') && <button onClick={() => setActiveTab('frota')} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'frota' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}>Frota</button>}
+                {hasModuleAccess('gerenciamento') && <button onClick={() => setActiveTab('management')} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'management' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}>Gerenciamento</button>}
+                {hasModuleAccess('frota') && <button onClick={() => setActiveTab('fleet')} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'fleet' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}>Frota</button>}
                 {hasModuleAccess('users') && <button onClick={() => setActiveTab('users')} className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'users' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}>Usuários</button>}
               </div>
             </div>
@@ -207,8 +208,8 @@ const App: React.FC = () => {
       <main>
         {activeTab === 'home' && <Home profile={profile} notes={notes} vehicles={vehicles} notesLoading={dataLoading} vehiclesLoading={fleetLoading} navigateTo={navigateTo} />}
         {activeTab === 'dashboard' && hasModuleAccess('dashboard') && <Dashboard notes={notes} isLoading={dataLoading} />}
-        {activeTab === 'gerenciamento' && hasModuleAccess('gerenciamento') && <Management notes={notes} isLoading={dataLoading} showToast={showToast} />}
-        {activeTab === 'frota' && hasModuleAccess('frota') && <Fleet notes={notes} vehicles={vehicles} isLoading={dataLoading || fleetLoading} error={fleetError} />}
+        {activeTab === 'management' && hasModuleAccess('gerenciamento') && <Management notes={notes} isLoading={dataLoading} showToast={showToast} />}
+        {activeTab === 'fleet' && hasModuleAccess('frota') && <Fleet notes={notes} vehicles={vehicles} isLoading={dataLoading || fleetLoading} error={fleetError} />}
         {activeTab === 'users' && hasModuleAccess('users') && <UsersPage users={users} isLoading={usersLoading} showToast={showToast} />}
       </main>
 

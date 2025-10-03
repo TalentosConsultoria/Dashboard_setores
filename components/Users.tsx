@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { User, UserRole } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -116,9 +117,9 @@ export const UsersPage: React.FC<UsersPageProps> = ({ users, isLoading, showToas
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Função</label>
             <Select value={newRole} onChange={e => setNewRole(e.target.value as UserRole)}>
-              <option value="viewer">Viewer</option>
+              <option value="viewer">Visualizador</option>
               <option value="editor">Editor</option>
-              <option value="admin">Admin</option>
+              <option value="admin">Administrador</option>
             </Select>
           </div>
           <div className="sm:col-start-2 lg:col-start-4">
@@ -168,9 +169,9 @@ export const UsersPage: React.FC<UsersPageProps> = ({ users, isLoading, showToas
                         disabled={user.uid === profile?.uid}
                         className="max-w-xs"
                       >
-                        <option value="admin">Admin</option>
+                        <option value="admin">Administrador</option>
                         <option value="editor">Editor</option>
-                        <option value="viewer">Viewer</option>
+                        <option value="viewer">Visualizador</option>
                       </Select>
                        {user.uid === profile?.uid && <p className="text-xs text-gray-500 mt-1">Você não pode alterar sua própria função.</p>}
                     </td>

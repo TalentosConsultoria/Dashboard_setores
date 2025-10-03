@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import type { Note, Veiculo, UserProfile } from '../types';
 import { Spinner, IconFileText, IconTruck, IconPlusCircle } from './ui';
@@ -7,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-type Tab = 'home' | 'dashboard' | 'gerenciamento' | 'frota' | 'users';
+type Tab = 'home' | 'dashboard' | 'management' | 'fleet' | 'users';
 
 interface HomeProps {
   profile: UserProfile | null;
@@ -142,7 +141,7 @@ export const Home: React.FC<HomeProps> = ({ profile, notes, vehicles, notesLoadi
           <SummaryCard 
             title="Resumo da Frota"
             icon={<IconTruck className="w-8 h-8 text-green-400" />}
-            onClick={() => navigateTo('frota')}
+            onClick={() => navigateTo('fleet')}
             isLoading={vehiclesLoading}
           >
             <div className="flex justify-between items-center mb-2">
@@ -168,7 +167,7 @@ export const Home: React.FC<HomeProps> = ({ profile, notes, vehicles, notesLoadi
           <SummaryCard
             title="Ações Rápidas"
             icon={<IconPlusCircle className="w-8 h-8 text-gray-400"/>}
-            onClick={() => navigateTo('gerenciamento')}
+            onClick={() => navigateTo('management')}
             isLoading={false} // This card doesn't load data
           >
             <p className="text-sm text-gray-400">Acesse para adicionar, editar ou importar novos registros financeiros.</p>

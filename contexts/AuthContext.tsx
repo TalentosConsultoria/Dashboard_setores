@@ -1,13 +1,12 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { 
   onAuthStateChanged, 
+  auth, 
   fetchRoles, 
+  FirebaseUser,
   fetchUserProfile,
   createUserProfileInDB,
 } from '../services/firebaseService';
-// Import the re-exported FirebaseUser type from the service module
-import type { FirebaseUser } from '../services/firebaseService';
 import type { UserProfile } from '../types';
 
 interface AuthContextType {
@@ -27,11 +26,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(async (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
           let userProfileData = await fetchUserProfile(firebaseUser.uid);
 
+          // If user profile doesn't exist in DB, create it.
+          // This is a special bootstrap for the first admin user.
           if (!userProfileData) {
             const initialRole = firebaseUser.email === 'andersoncamposjr@gmail.com' ? 'admin' : 'viewer';
             await createUserProfileInDB(firebaseUser, initialRole);

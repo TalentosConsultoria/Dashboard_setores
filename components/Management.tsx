@@ -1,10 +1,16 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Note } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { Button, Input, Select, Modal, IconPlusCircle, IconUploadCloud, IconSearch, IconEdit, IconTrash2, IconFileText, IconInfo } from './ui';
+import { Button, Input, Select, Modal, IconPlusCircle, IconUploadCloud, IconSearch, IconEdit, IconTrash2, IconFileText } from './ui';
 import { addNote, updateNote, deleteNote, importNotesFromCSV } from '../services/firebaseService';
-import * as Papa from 'papaparse';
+import Papa from 'papaparse';
+
+interface ManagementProps {
+  notes: Note[];
+  isLoading: boolean;
+  showToast: (message: string, type: 'success' | 'error') => void;
+}
 
 // ========== DATE HELPERS ==========
 const parseDateString = (dateStr: string | undefined | null): Date | null => {
@@ -27,7 +33,7 @@ const parseDateString = (dateStr: string | undefined | null): Date | null => {
 const toInputDate = (isoString: string | undefined): string => {
   if (!isoString) return '';
   try {
-    return new Date(isoString).toISOString().split('T')[0];
+    return isoString.split('T')[0];
   } catch {
     return '';
   }
@@ -43,7 +49,7 @@ const formatDate = (isoString: string): string => {
 };
 
 
-// ========== MODAL COMPONENT (REFACTORED) ==========
+// ========== COMPONENTS ==========
 const NoteModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -51,53 +57,30 @@ const NoteModal: React.FC<{
   showToast: (message: string, type: 'success' | 'error') => void;
 }> = ({ isOpen, onClose, note, showToast }) => {
   const [isSaving, setIsSaving] = useState(false);
-  const [formData, setFormData] = useState<Partial<Note>>({});
-
-  useEffect(() => {
-    if (isOpen) {
-        // FIX: Add explicit type annotation to prevent type inference issue.
-        const initialData: Partial<Note> = note
-          ? { ...note }
-          : { status: 'Não Pago', dataEmissao: new Date().toISOString() };
-      setFormData(initialData);
-    }
-  }, [isOpen, note]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSaving(true);
+    const formData = new FormData(e.currentTarget);
+    const data = Object.fromEntries(formData.entries());
 
-    const { cliente, dataEmissao, valor, status } = formData;
-    if (!cliente || !dataEmissao || !valor || !status) {
-      showToast('Preencha todos os campos obrigatórios.', 'error');
-      setIsSaving(false);
-      return;
-    }
-    
-    const parsedDate = parseDateString(dataEmissao as string);
+    const parsedDate = parseDateString(data.dataEmissao as string);
+
     if (!parsedDate) {
       showToast('O formato da data é inválido.', 'error');
       setIsSaving(false);
       return;
     }
 
-    const valorNumerico = parseFloat(String(valor).replace(',', '.'));
-    if (isNaN(valorNumerico)) {
-        showToast('O valor inserido é inválido.', 'error');
-        setIsSaving(false);
-        return;
-    }
-
     const noteData = {
-      ...formData,
-      valor: valorNumerico,
+      nNota: data.nNota as string,
+      cliente: data.cliente as string,
+      materialServico: data.materialServico as string,
+      categoria: data.categoria as string,
       dataEmissao: parsedDate.toISOString(),
-      veiculoPlaca: formData.veiculoPlaca ? formData.veiculoPlaca.toUpperCase() : undefined,
+      valor: parseFloat(data.valor as string) || 0,
+      status: data.status as 'Pago' | 'Não Pago',
+      veiculoPlaca: (data.veiculoPlaca as string).toUpperCase(),
     };
     
     try {
@@ -124,35 +107,35 @@ const NoteModal: React.FC<{
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium">Cliente</label>
-              <Input name="cliente" value={formData.cliente || ''} onChange={handleChange} required className="mt-1" />
+              <Input id="cliente" name="cliente" defaultValue={note?.cliente || ''} required className="mt-1" />
             </div>
             <div>
               <label className="block text-sm font-medium">Material/Serviço</label>
-              <Input name="materialServico" value={formData.materialServico || ''} onChange={handleChange} className="mt-1" />
+              <Input id="materialServico" name="materialServico" defaultValue={note?.materialServico || ''} className="mt-1" />
             </div>
             <div>
               <label className="block text-sm font-medium">Placa do Veículo (Opcional)</label>
-              <Input name="veiculoPlaca" value={formData.veiculoPlaca || ''} onChange={handleChange} className="mt-1" placeholder="AAA0A00" />
+              <Input id="veiculoPlaca" name="veiculoPlaca" defaultValue={note?.veiculoPlaca || ''} className="mt-1" placeholder="AAA0A00" />
             </div>
              <div>
               <label className="block text-sm font-medium">Nº da Nota</label>
-              <Input name="nNota" value={formData.nNota || ''} onChange={handleChange} className="mt-1" />
+              <Input id="nNota" name="nNota" defaultValue={note?.nNota || ''} className="mt-1" />
             </div>
             <div>
               <label className="block text-sm font-medium">Categoria</label>
-              <Input name="categoria" value={formData.categoria || ''} onChange={handleChange} required className="mt-1" />
+              <Input id="categoria" name="categoria" defaultValue={note?.categoria || ''} required className="mt-1" />
             </div>
             <div>
               <label className="block text-sm font-medium">Data</label>
-              <Input type="date" name="dataEmissao" value={toInputDate(formData.dataEmissao)} onChange={handleChange} required className="mt-1" />
+              <Input type="date" id="dataEmissao" name="dataEmissao" defaultValue={toInputDate(note?.dataEmissao) || new Date().toISOString().split('T')[0]} required className="mt-1" />
             </div>
             <div>
               <label className="block text-sm font-medium">Valor Total (R$)</label>
-              <Input type="number" name="valor" min="0" step="0.01" value={formData.valor || ''} onChange={handleChange} required className="mt-1" />
+              <Input type="number" id="valor" name="valor" min="0" step="0.01" defaultValue={note?.valor || ''} required className="mt-1" />
             </div>
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium">Status</label>
-              <Select name="status" value={formData.status || 'Não Pago'} onChange={handleChange} required className="mt-1">
+              <Select id="status" name="status" defaultValue={note?.status || 'Não Pago'} required className="mt-1">
                 <option value="Não Pago">Não Pago</option>
                 <option value="Pago">Pago</option>
               </Select>
@@ -168,20 +151,11 @@ const NoteModal: React.FC<{
   );
 };
 
-// ========== MAIN COMPONENT ==========
-// FIX: Defined the missing ManagementProps interface.
-interface ManagementProps {
-  notes: Note[];
-  isLoading: boolean;
-  showToast: (message: string, type: 'success' | 'error') => void;
-}
 
 export const Management: React.FC<ManagementProps> = ({ notes, isLoading, showToast }) => {
   const { profile } = useAuth();
-  const [isNoteModalOpen, setNoteModalOpen] = useState(false);
-  const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
-  const [noteToDelete, setNoteToDelete] = useState<Note | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredNotes = useMemo(() => {
@@ -195,30 +169,23 @@ export const Management: React.FC<ManagementProps> = ({ notes, isLoading, showTo
   
   const handleAddClick = () => {
     setSelectedNote(null);
-    setNoteModalOpen(true);
+    setIsModalOpen(true);
   };
   
   const handleEditClick = (note: Note) => {
     setSelectedNote(note);
-    setNoteModalOpen(true);
+    setIsModalOpen(true);
   };
 
-  const handleDeleteClick = (note: Note) => {
-    setNoteToDelete(note);
-    setDeleteModalOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!noteToDelete) return;
-    try {
-      await deleteNote(noteToDelete.id);
-      showToast('Registro excluído com sucesso!', 'success');
-    } catch (error) {
-      console.error('Failed to delete note:', error);
-      showToast('Erro ao excluir o registro.', 'error');
-    } finally {
-      setDeleteModalOpen(false);
-      setNoteToDelete(null);
+  const handleDeleteClick = async (id: string) => {
+    if (window.confirm('Tem certeza que deseja excluir este registro?')) {
+      try {
+        await deleteNote(id);
+        showToast('Registro excluído com sucesso!', 'success');
+      } catch (error) {
+        console.error('Failed to delete note:', error);
+        showToast('Erro ao excluir o registro.', 'error');
+      }
     }
   };
   
@@ -270,7 +237,7 @@ export const Management: React.FC<ManagementProps> = ({ notes, isLoading, showTo
         showToast('Erro ao ler o arquivo CSV.', 'error');
       }
     });
-    event.target.value = '';
+    event.target.value = ''; // Reset file input
   };
   
   const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -339,8 +306,8 @@ export const Management: React.FC<ManagementProps> = ({ notes, isLoading, showTo
                     <td className="px-6 py-4 text-sm text-gray-300 font-semibold whitespace-nowrap">{formatCurrency(note.valor)}</td>
                     {profile?.permissions.canEdit && (
                       <td className="px-6 py-4 text-sm whitespace-nowrap">
-                        <Button variant="ghost" className="p-1 h-auto" onClick={() => handleEditClick(note)} aria-label={`Editar registro de ${note.cliente}`}><IconEdit className="w-5 h-5 text-blue-400" /></Button>
-                        <Button variant="ghost" className="p-1 h-auto" onClick={() => handleDeleteClick(note)} aria-label={`Excluir registro de ${note.cliente}`}><IconTrash2 className="w-5 h-5 text-red-400" /></Button>
+                        <Button variant="ghost" className="p-1 h-auto" onClick={() => handleEditClick(note)}><IconEdit className="w-5 h-5 text-blue-400" /></Button>
+                        <Button variant="ghost" className="p-1 h-auto" onClick={() => handleDeleteClick(note.id)}><IconTrash2 className="w-5 h-5 text-red-400" /></Button>
                       </td>
                     )}
                   </tr>
@@ -359,28 +326,7 @@ export const Management: React.FC<ManagementProps> = ({ notes, isLoading, showTo
         </div>
       </div>
       
-      {profile?.permissions.canEdit && <NoteModal isOpen={isNoteModalOpen} onClose={() => setNoteModalOpen(false)} note={selectedNote} showToast={showToast} />}
-
-      <Modal isOpen={isDeleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Confirmar Exclusão">
-        <div className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-900/50 sm:mx-0 sm:h-10 sm:w-10">
-                <IconInfo className="h-6 w-6 text-red-400" />
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-white">Excluir Registro</h3>
-              <p className="mt-2 text-sm text-gray-400">
-                Tem certeza que deseja excluir o registro do cliente <strong className="text-gray-200">{noteToDelete?.cliente}</strong>? Esta ação não pode ser desfeita.
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-gray-900 px-6 py-4 flex justify-end gap-3 rounded-b-lg">
-          <Button variant="secondary" onClick={() => setDeleteModalOpen(false)}>Cancelar</Button>
-          <Button variant="danger" onClick={handleConfirmDelete}>Excluir</Button>
-        </div>
-      </Modal>
-
+      {profile?.permissions.canEdit && <NoteModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} note={selectedNote} showToast={showToast} />}
     </div>
   );
 };
