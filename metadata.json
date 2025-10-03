@@ -1,0 +1,5 @@
+{
+  "name": "Firebase Financial Dashboard",
+  "description": "A real-time, interactive financial dashboard connected to Firebase. It provides analytics, charts, and management tools for financial records, including features for adding, editing, deleting, and importing data.",
+  "requestFramePermissions": []
+}

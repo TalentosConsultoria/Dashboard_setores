@@ -1,0 +1,43 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "roles": {
+      ".read": "auth != null"
+    },
+    
+    "users": {
+      ".read": "auth != null",
+      "$uid": {
+        // Rule for the entire user profile object (excluding role)
+        // A user can create their own profile, or an admin can write to it.
+        ".write": "auth != null && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'admin')",
+        
+        // Stricter rule specifically for the 'role' field
+        "role": {
+          // A role can be written IF:
+          // 1. An admin is making the change.
+          // 2. The user profile is being created for the first time (!data.exists()).
+          ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || !data.exists())",
+          // The new role value must be one of the allowed strings.
+          ".validate": "newData.isString() && (newData.val() === 'admin' || newData.val() === 'editor' || newData.val() === 'viewer')"
+        }
+      }
+    },
+
+    "notas_fiscais": {
+      ".indexOn": ["createdAt"],
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || root.child('users').child(auth.uid).child('role').val() === 'editor')",
+      "$noteId": {
+        ".validate": "newData.hasChildren(['valor']) && newData.child('valor').isNumber() && (!newData.child('cliente').exists() || newData.child('cliente').isString()) && (!newData.child('categoria').exists() || newData.child('categoria').isString()) && (!newData.child('dataEmissao').exists() || newData.child('dataEmissao').isString()) && (!newData.child('status').exists() || newData.child('status').isString())"
+      }
+    },
+
+    "frota": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    }
+  }
+}
